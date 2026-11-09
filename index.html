@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Trading Bot Dashboard · Practice</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#111827;--mut:#6b7280;--bd:#e5e7eb;--pos:#059669;--neg:#dc2626;--acc:#2563eb;--chip:#eef2ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f17;--card:#121826;--fg:#e5e7eb;--mut:#9ca3af;--bd:#1f2937;--pos:#34d399;--neg:#f87171;--acc:#60a5fa;--chip:#1e293b}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bd);background:var(--card);position:sticky;top:0;z-index:2}
+h1{font-size:17px;margin:0}h2{font-size:15px;margin:0 0 10px}
+.badge{font-size:11px;padding:2px 8px;border-radius:999px;background:#f59e0b22;color:#b45309;border:1px solid #f59e0b55;margin-left:6px}
+main{max-width:1180px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;overflow:auto}
+.kpi .l{color:var(--mut);font-size:12px}.kpi .v{font-size:22px;font-weight:650;margin-top:2px}.kpi .s{font-size:12px;color:var(--mut)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.mut{color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:550;font-size:12px}
+.chip{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--chip);font-size:11px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,input{font:inherit;border-radius:8px;border:1px solid var(--bd);padding:8px 12px;background:var(--card);color:var(--fg)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;cursor:pointer}button{cursor:pointer}
+#login{max-width:380px;margin:12vh auto;padding:22px}#login input{width:100%;margin:10px 0}
+.empty{color:var(--mut);padding:10px 0}
+.two{display:grid;gap:14px;grid-template-columns:1fr}@media(min-width:900px){.two{grid-template-columns:1.4fr 1fr}}
+svg text{fill:var(--mut);font-size:10px}
+.err{color:var(--neg);font-size:13px}
+ul.rules{margin:0;padding-left:18px}ul.rules li{margin:3px 0}
+</style>
+</head>
+<body>
+<div id="login" class="card" hidden>
+  <h1>Trading Bot Dashboard <span class="badge">PRACTICE</span></h1>
+  <p class="mut">Private. Sign in with a magic link sent to the owner's email.</p>
+  <form id="lf"><input id="em" type="email" placeholder="you@example.com" autocomplete="email" required>
+  <button class="primary" type="submit" style="width:100%">Send magic link</button></form>
+  <p id="lmsg" class="mut"></p>
+</div>
+
+<div id="app" hidden>
+<header>
+  <div><h1>Trading Bot Dashboard <span class="badge">PRACTICE · demo</span></h1>
+  <div class="mut" style="font-size:12px">Buffett Value + Technical Timing · Trading212 Practice (EUR) · read-only</div></div>
+  <div class="row"><span class="mut" id="upd">Loading…</span><button id="rf">Refresh</button><button id="lo">Sign out</button></div>
+</header>
+<main>
+  <div id="err" class="err"></div>
+  <section class="grid" id="kpis"></section>
+  <section class="two">
+    <div class="card"><h2>Equity curve</h2><div id="curve"></div></div>
+    <div class="card"><h2>Performance (closed trades)</h2><div id="perf"></div></div>
+  </section>
+  <section class="card"><h2>Open positions</h2><div id="positions"></div></section>
+  <section class="card"><h2>Pending orders (incl. stops)</h2><div id="orders"></div></section>
+  <section class="card"><h2>Closed trades</h2><div id="closed"></div></section>
+  <section class="card"><h2>Today's watchlist <span class="mut" id="scrAsof" style="font-weight:400;font-size:12px"></span></h2><div id="watch"></div></section>
+  <section class="card"><h2>Strategy</h2><div id="strategy"></div></section>
+  <p class="mut" style="font-size:12px;text-align:center">Live account data refreshes every 30 s (server cache ≈15 s). Journal syncs after each bot run. Not financial advice.</p>
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://tcgigaykwztzzxkaeofn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjZ2lnYXlrd3p0enp4a2Flb2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzODkzNDAsImV4cCI6MjEwMTk2NTM0MH0.FyDom3DshGUoF0dNryOJdeZ46nyD_W5hgYqCiLp0CcI"; // public by design
+const OWNER = "leduchieu642@gmail.com";
+const FN = SUPABASE_URL + "/functions/v1/t212-live";
+const TZ = "Europe/Amsterdam";
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" } }) : null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const n = (x) => (x === null || x === undefined || x === "" || isNaN(+x)) ? null : +x;
+const eur = (x, d = 2) => n(x) === null ? "–" : "€" + (+x).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+const num = (x, d = 2) => n(x) === null ? "–" : (+x).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 2) => n(x) === null ? "–" : ((+x) >= 0 ? "+" : "") + ((+x) * 100).toFixed(d) + "%";
+const cls = (x) => n(x) === null ? "" : (+x > 0 ? "pos" : (+x < 0 ? "neg" : ""));
+const ams = (t) => t ? new Date(t).toLocaleString("en-GB", { timeZone: TZ, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " CET" : "–";
+const table = (heads, rows, empty) => rows.length ? `<table><thead><tr>${heads.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="empty">${empty}</div>`;
+
+function curveSvg(points) {
+  if (!points.length) return '<div class="empty">No equity history yet.</div>';
+  const W = 640, H = 200, P = 34;
+  const ys = points.map((p) => p.equity), lo = Math.min(...ys, 1800), hi = Math.max(...ys, 2000);
+  const span = (hi - lo) || 1, x = (i) => P + (points.length === 1 ? (W - 2 * P) / 2 : i * (W - 2 * P) / (points.length - 1)), y = (v) => H - P + 8 - (v - lo) / span * (H - 2 * P);
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`).join(" ");
+  const ref = (v, lab, col) => `<line x1="${P}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}" stroke="${col}" stroke-dasharray="4 4" stroke-width="1"/><text x="${W - 8}" y="${y(v) - 3}" text-anchor="end">${lab}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Equity curve">
+    ${ref(2000, "Baseline €2,000", "var(--mut)")}${ref(1800, "Guard €1,800", "var(--neg)")}
+    <path d="${line}" fill="none" stroke="var(--acc)" stroke-width="2"/>
+    ${points.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.equity)}" r="${points.length < 40 ? 3 : 0}" fill="var(--acc)"><title>${p.date}: ${eur(p.equity)}</title></circle>`).join("")}
+    <text x="${P}" y="${H - 4}">${esc(points[0].date)}</text><text x="${W - 8}" y="${H - 4}" text-anchor="end">${esc(points[points.length - 1].date)}</text>
+  </svg>`;
+}
+
+function render(d) {
+  const live = d.live || {}, j = d.journal || {}, cash = live.cash || {}, snaps = j.snapshots || {};
+  const baseline = n((snaps.baseline || {}).total) ?? n(((j.meta || {}).baseline || {}).total) ?? 2000;
+  const equity = n(cash.total), ret = equity !== null ? equity / baseline - 1 : null;
+  $("err").textContent = live.error ? "Live data unavailable: " + live.error : (live.cash_error || live.portfolio_error || live.orders_error ? "Some live calls failed: " + [live.cash_error, live.portfolio_error, live.orders_error].filter(Boolean).join(", ") : "");
+  const positions = Array.isArray(live.portfolio) ? live.portfolio : [];
+  const orders = Array.isArray(live.orders) ? live.orders : [];
+  const stops = {}; orders.forEach((o) => { if (n(o.stopPrice) !== null && ((n(o.quantity) ?? 0) < 0 || /STOP/i.test(o.type || ""))) stops[o.ticker] = n(o.stopPrice); });
+  const guard = equity !== null && equity <= 1800;
+  $("kpis").innerHTML = [
+    ["Equity", eur(equity), `Baseline ${eur(baseline)}`],
+    ["Return vs baseline", `<span class="${cls(ret)}">${pct(ret)}</span>`, `<span class="${cls(equity - baseline)}">${eur(equity !== null ? equity - baseline : null)}</span>`],
+    ["Cash (free)", eur(cash.free), `Blocked ${eur(cash.blocked)}`],
+    ["Invested", eur(cash.invested), equity ? pct((n(cash.invested) || 0) / equity, 1).replace("+", "") + " of equity" : ""],
+    ["Unrealised PnL", `<span class="${cls(cash.ppl)}">${eur(cash.ppl)}</span>`, `${positions.length} open / max 8`],
+    ["Realised (T212)", `<span class="${cls(cash.result)}">${eur(cash.result)}</span>`, guard ? '<span class="neg">Guard hit: new trades paused</span>' : "Guard at €1,800"],
+  ].map(([l, v, s]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+
+  $("positions").innerHTML = table(["Ticker", "Qty", "Avg price", "Price", "Stop", "To stop", "PnL (EUR)", "FX PnL", "Since"],
+    positions.map((p) => { const st = stops[p.ticker] ?? null, cur = n(p.currentPrice); return [
+      `<b>${esc(p.ticker)}</b>`, num(p.quantity, 4), num(p.averagePrice), num(cur), st === null ? '<span class="neg">none</span>' : num(st),
+      st !== null && cur ? pct((cur - st) / cur, 1).replace("+", "") : "–", `<span class="${cls(p.ppl)}">${eur(p.ppl)}</span>`, eur(p.fxPpl), esc((p.initialFillDate || "").slice(0, 10))]; }),
+    "No open positions. The bot is in cash until a stock passes every rule.");
+
+  $("orders").innerHTML = table(["Ticker", "Type", "Qty", "Stop", "Limit", "Status", "Created"],
+    orders.map((o) => [`<b>${esc(o.ticker)}</b>`, `<span class="chip">${esc(o.type)}</span>`, num(o.quantity, 4), num(o.stopPrice), num(o.limitPrice), esc(o.status), ams(o.creationTime)]),
+    "No pending orders.");
+
+  const eqh = (j.equity_history || []).map((r) => ({ date: String(r.date).slice(0, 10), equity: +r.equity }));
+  if (equity !== null) { const today = new Date().toLocaleDateString("en-CA", { timeZone: TZ }); const last = eqh[eqh.length - 1]; if (last && last.date === today) last.equity = equity; else eqh.push({ date: today, equity }); }
+  $("curve").innerHTML = curveSvg(eqh);
+
+  const ct = j.closed_trades || [], rs = ct.map((t) => n(t.r_multiple)).filter((x) => x !== null);
+  const wins = rs.filter((r) => r > 0), losses = rs.filter((r) => r <= 0), avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+  const realised = ct.reduce((s, t) => s + (n(t.realised_pnl_eur) || 0), 0);
+  let peak = -Infinity, mdd = 0; eqh.forEach((p) => { peak = Math.max(peak, p.equity); mdd = Math.min(mdd, p.equity / peak - 1); });
+  $("perf").innerHTML = `<table><tbody>
+    <tr><td>Closed trades</td><td>${ct.length}</td></tr>
+    <tr><td>Win rate</td><td>${rs.length ? pct(wins.length / rs.length, 0).replace("+", "") : "–"}</td></tr>
+    <tr><td>Expectancy (avg R)</td><td class="${cls(avg(rs))}">${avg(rs) === null ? "–" : num(avg(rs)) + " R"}</td></tr>
+    <tr><td>Avg win / avg loss</td><td>${avg(wins) === null ? "–" : num(avg(wins)) + " R"} / ${avg(losses) === null ? "–" : num(avg(losses)) + " R"}</td></tr>
+    <tr><td>Realised PnL (journal)</td><td class="${cls(realised)}">${eur(realised)}</td></tr>
+    <tr><td>Max drawdown (daily)</td><td class="${cls(mdd)}">${pct(mdd, 1)}</td></tr></tbody></table>
+    ${ct.length ? "" : '<div class="empty">No closed trades yet. Results are measured in R (multiples of the initial risk).</div>'}`;
+
+  $("closed").innerHTML = table(["Closed", "Ticker", "Qty", "Entry", "Exit", "R", "PnL (EUR)", "Reason"],
+    ct.map((t) => [ams(t.closed_at_ams), `<b>${esc(t.ticker)}</b>`, num(t.qty, 4), num(t.entry), num(t.exit), `<span class="${cls(t.r_multiple)}">${n(t.r_multiple) === null ? "–" : num(t.r_multiple) + " R"}</span>`, `<span class="${cls(t.realised_pnl_eur)}">${eur(t.realised_pnl_eur)}</span>`, esc(t.exit_reason)]),
+    "No closed trades yet.");
+
+  const ss = snaps.screen_summary || {};
+  $("scrAsof").textContent = ss.asof_ams ? `· screened ${ams(ss.asof_ams)} · ${ss.fund_pass_count ?? "?"} of ${ss.universe_size ?? "?"} pass quality/value, ${ss.entry_ready_count ?? "?"} entry-ready` : "";
+  $("watch").innerHTML = table(["Stock", "Region", "Entry?", "Close", "200d SMA", "vs SMA", "RSI(14)", "P/E", "FCF yld", "12-1 mom", "Blocker"],
+    (j.screen || []).map((r) => [`<b>${esc(r.name)}</b> <span class="mut">${esc(r.yf_ticker)}</span>`, `<span class="chip">${esc(r.region)}</span>`,
+      r.entry_ready ? '<span class="pos">✓ ready</span>' : '<span class="mut">wait</span>', num(r.close), num(r.sma200), `<span class="${cls(r.pct_above_sma)}">${n(r.pct_above_sma) === null ? "–" : num(r.pct_above_sma, 1) + "%"}</span>`,
+      num(r.rsi14, 1), num(r.pe, 1), pct(r.fcf_yield, 1).replace("+", ""), pct(r.mom_12_1, 0), `<span title="${esc(r.blocker || "")}" style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">${esc(r.blocker || "")}</span>`]),
+    "No screen synced yet.");
+
+  const st = (j.meta || {}).strategy || {}, rules = st.rules || {};
+  $("strategy").innerHTML = `<div class="mut" style="margin-bottom:6px">${esc(st.name || "")} · ${esc(st.version || "")} · ${esc(st.account || "")}</div>
+    <ul class="rules">${Object.entries(rules).map(([k, v]) => `<li><b>${esc(k.replace(/_/g, " "))}:</b> ${esc(v)}</li>`).join("")}</ul>`;
+
+  const snapAsof = (snaps.snapshot || {}).asof_ams;
+  $("upd").innerHTML = `Live: ${ams(live.fetched_at)}${live.cached ? " (cached)" : ""} · Journal: ${ams(snapAsof)}`;
+}
+window.__render = render;
+
+let timer = null, busy = false;
+async function load() {
+  if (busy || !sb) return; busy = true;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return showLogin();
+    const r = await fetch(FN, { headers: { Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON_KEY } });
+    if (r.status === 401) { await sb.auth.signOut(); return showLogin("Session expired. Please sign in again."); }
+    if (r.status === 403) { await sb.auth.signOut(); return showLogin("This account is not allowed."); }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    render(await r.json());
+  } catch (e) { $("err").textContent = "Refresh failed: " + e.message + " (will retry)"; }
+  finally { busy = false; }
+}
+function showLogin(msg) { clearInterval(timer); timer = null; $("app").hidden = true; $("login").hidden = false; if (msg) $("lmsg").textContent = msg; }
+function showApp() { $("login").hidden = true; $("app").hidden = false; load(); if (!timer) timer = setInterval(() => { if (!document.hidden) load(); }, 30000); }
+
+$("lf").addEventListener("submit", async (e) => {
+  e.preventDefault(); const email = $("em").value.trim().toLowerCase();
+  if (email !== OWNER) { $("lmsg").textContent = "This dashboard is private."; return; }
+  $("lmsg").textContent = "Sending…";
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
+  $("lmsg").textContent = error ? "Could not send link: " + error.message : "Check your inbox and open the link on this device.";
+});
+$("lo").onclick = async () => { await sb.auth.signOut(); showLogin("Signed out."); };
+$("rf").onclick = load;
+document.addEventListener("visibilitychange", () => { if (!document.hidden && timer) load(); });
+
+if (sb) {
+  sb.auth.onAuthStateChange((ev, session) => { if (session && (session.user?.email || "").toLowerCase() === OWNER) showApp(); else if (ev === "SIGNED_OUT") showLogin(); });
+  sb.auth.getSession().then(({ data: { session } }) => session ? showApp() : showLogin());
+} else showLogin("Could not load the Supabase library.");
+</script>
+</body>
+</html>
