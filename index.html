@@ -57,7 +57,7 @@ ul.rules{margin:0;padding-left:18px}ul.rules li{margin:3px 0}
   <section class="card"><h2>Closed trades</h2><div id="closed"></div></section>
   <section class="card"><h2>Today's watchlist <span class="mut" id="scrAsof" style="font-weight:400;font-size:12px"></span></h2><div id="watch"></div></section>
   <section class="card"><h2>Strategy</h2><div id="strategy"></div></section>
-  <p class="mut" style="font-size:12px;text-align:center">Live account data refreshes every 30 s (server cache ≈15 s). Journal syncs after each bot run. Not financial advice.</p>
+  <p class="mut" style="font-size:12px;text-align:center">Live account data refreshes every 60 s (server cache ≈60 s, shared). Journal syncs after each bot run. Not financial advice.</p>
 </main>
 </div>
 
@@ -99,7 +99,11 @@ function render(d) {
   const live = d.live || {}, j = d.journal || {}, cash = live.cash || {}, snaps = j.snapshots || {};
   const baseline = n((snaps.baseline || {}).total) ?? n(((j.meta || {}).baseline || {}).total) ?? 2000;
   const equity = n(cash.total), ret = equity !== null ? equity / baseline - 1 : null;
-  $("err").textContent = live.error ? "Live data unavailable: " + live.error : (live.cash_error || live.portfolio_error || live.orders_error ? "Some live calls failed: " + [live.cash_error, live.portfolio_error, live.orders_error].filter(Boolean).join(", ") : "");
+  const liveFieldErrs = [["cash", live.cash_error], ["portfolio", live.portfolio_error], ["orders", live.orders_error]]
+    .filter(([k, e]) => e && (live[k] === null || live[k] === undefined))
+    .map(([, e]) => e);
+  $("err").textContent = live.error && !live.cash && !live.portfolio ? ("Live data unavailable: " + live.error)
+    : (liveFieldErrs.length ? ("Some live calls failed: " + liveFieldErrs.join(", ")) : "");
   const positions = Array.isArray(live.portfolio) ? live.portfolio : [];
   const orders = Array.isArray(live.orders) ? live.orders : [];
   const stops = {}; orders.forEach((o) => { if (n(o.stopPrice) !== null && ((n(o.quantity) ?? 0) < 0 || /STOP/i.test(o.type || ""))) stops[o.ticker] = n(o.stopPrice); });
@@ -157,7 +161,14 @@ function render(d) {
     <ul class="rules">${Object.entries(rules).map(([k, v]) => `<li><b>${esc(k.replace(/_/g, " "))}:</b> ${esc(v)}</li>`).join("")}</ul>`;
 
   const snapAsof = (snaps.snapshot || {}).asof_ams;
-  $("upd").innerHTML = `Live: ${ams(live.fetched_at)}${live.cached ? " (cached)" : ""} · Journal: ${ams(snapAsof)}`;
+  const liveAt = live.fetched_at ? new Date(live.fetched_at).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }) : null;
+  let liveLabel = "Live: –";
+  if (liveAt) {
+    if (live.stale || live.source === "journal_snapshot") liveLabel = `as of ${liveAt} (cached)`;
+    else if (live.cached) liveLabel = `Live: ${liveAt} (cached)`;
+    else liveLabel = `Live: ${ams(live.fetched_at)}`;
+  }
+  $("upd").innerHTML = `${liveLabel} · Journal: ${ams(snapAsof)}`;
 }
 window.__render = render;
 
@@ -176,7 +187,7 @@ async function load() {
   finally { busy = false; }
 }
 function showLogin(msg) { clearInterval(timer); timer = null; $("app").hidden = true; $("login").hidden = false; if (msg) $("lmsg").textContent = msg; }
-function showApp() { $("login").hidden = true; $("app").hidden = false; load(); if (!timer) timer = setInterval(() => { if (!document.hidden) load(); }, 30000); }
+function showApp() { $("login").hidden = true; $("app").hidden = false; load(); if (!timer) timer = setInterval(() => { if (!document.hidden) load(); }, 60000); }
 
 $("lf").addEventListener("submit", async (e) => {
   e.preventDefault(); const email = $("em").value.trim().toLowerCase();
