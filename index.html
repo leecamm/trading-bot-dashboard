@@ -24,6 +24,7 @@ button,input{font:inherit;border-radius:8px;border:1px solid var(--bd);padding:8
 button.primary{background:var(--acc);border-color:var(--acc);color:#fff;cursor:pointer}button{cursor:pointer}
 #login{max-width:380px;margin:12vh auto;padding:22px}#login input{width:100%;margin:10px 0}
 .empty{color:var(--mut);padding:10px 0}
+.tk{line-height:1.25}.tk b{display:block}.tk .raw{font-size:11px;color:var(--mut)}
 .two{display:grid;gap:14px;grid-template-columns:1fr}@media(min-width:900px){.two{grid-template-columns:1.4fr 1fr}}
 svg text{fill:var(--mut);font-size:10px}
 .err{color:var(--neg);font-size:13px}
@@ -79,6 +80,144 @@ const pct = (x, d = 2) => n(x) === null ? "–" : ((+x) >= 0 ? "+" : "") + ((+x)
 const cls = (x) => n(x) === null ? "" : (+x > 0 ? "pos" : (+x < 0 ? "neg" : ""));
 const ams = (t) => t ? new Date(t).toLocaleString("en-GB", { timeZone: TZ, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " CET" : "–";
 const table = (heads, rows, empty) => rows.length ? `<table><thead><tr>${heads.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="empty">${empty}</div>`;
+/* T212 instrument codes -> [display name, Yahoo / exchange ticker]. Covers the 97-name universe. */
+const T212 = {
+  "AAPL_US_EQ":["Apple","AAPL"],
+  "MSFT_US_EQ":["Microsoft","MSFT"],
+  "GOOGL_US_EQ":["Alphabet","GOOGL"],
+  "AMZN_US_EQ":["Amazon","AMZN"],
+  "FB_US_EQ":["Meta","META"],
+  "NVDA_US_EQ":["Nvidia","NVDA"],
+  "BRK_B_US_EQ":["Berkshire Hathaway","BRK-B"],
+  "JNJ_US_EQ":["Johnson & Johnson","JNJ"],
+  "PG_US_EQ":["Procter & Gamble","PG"],
+  "KO_US_EQ":["Coca-Cola","KO"],
+  "PEP_US_EQ":["PepsiCo","PEP"],
+  "COST_US_EQ":["Costco Wholesale","COST"],
+  "WMT_US_EQ":["Walmart","WMT"],
+  "UNH_US_EQ":["UnitedHealth","UNH"],
+  "V_US_EQ":["Visa","V"],
+  "MA_US_EQ":["Mastercard","MA"],
+  "JPM_US_EQ":["JPMorgan Chase & Co","JPM"],
+  "XOM_US_EQ":["ExxonMobil","XOM"],
+  "CVX_US_EQ":["Chevron","CVX"],
+  "HD_US_EQ":["Home Depot","HD"],
+  "MCD_US_EQ":["McDonald's","MCD"],
+  "ABBV_US_EQ":["AbbVie","ABBV"],
+  "MRK_US_EQ":["Merck & Co","MRK"],
+  "LLY_US_EQ":["Eli Lilly & Co","LLY"],
+  "AVGO_US_EQ":["Broadcom","AVGO"],
+  "ORCL_US_EQ":["Oracle","ORCL"],
+  "CRM_US_EQ":["Salesforce","CRM"],
+  "ACN_US_EQ":["Accenture","ACN"],
+  "CSCO_US_EQ":["Cisco Systems","CSCO"],
+  "IBM_US_EQ":["IBM","IBM"],
+  "CAT_US_EQ":["Caterpillar","CAT"],
+  "HON_US_EQ":["Honeywell","HON"],
+  "NEE_US_EQ":["NextEra","NEE"],
+  "AXP_US_EQ":["American Express","AXP"],
+  "CL_US_EQ":["Colgate","CL"],
+  "PM_US_EQ":["Philip Morris","PM"],
+  "MO_US_EQ":["Altria","MO"],
+  "MCp_EQ":["LVMH","MC.PA"],
+  "ORp_EQ":["L'Oreal","OR.PA"],
+  "AIRp_EQ":["Airbus","AIR.PA"],
+  "SANp_EQ":["Sanofi","SAN.PA"],
+  "BNPp_EQ":["BNP Paribas","BNP.PA"],
+  "FPp_EQ":["TotalEnergies","TTE.PA"],
+  "SUp_EQ":["Schneider Electric","SU.PA"],
+  "AIp_EQ":["Air Liquide","AI.PA"],
+  "ELp_EQ":["EssilorLuxottica","EL.PA"],
+  "KERp_EQ":["Kering","KER.PA"],
+  "BNp_EQ":["Danone","BN.PA"],
+  "SIEd_EQ":["Siemens","SIE.DE"],
+  "SAPd_EQ":["SAP","SAP.DE"],
+  "ALVd_EQ":["Allianz","ALV.DE"],
+  "DTEd_EQ":["Deutsche Telekom","DTE.DE"],
+  "BASd_EQ":["BASF","BAS.DE"],
+  "BAYNd_EQ":["Bayer","BAYN.DE"],
+  "MUV2d_EQ":["Munich Re","MUV2.DE"],
+  "ADSd_EQ":["Adidas","ADS.DE"],
+  "BMWd_EQ":["BMW","BMW.DE"],
+  "DAId_EQ":["Mercedes-Benz","MBG.DE"],
+  "VOW3d_EQ":["Volkswagen","VOW3.DE"],
+  "IFXd_EQ":["Infineon","IFX.DE"],
+  "ASMLa_EQ":["ASML","ASML.AS"],
+  "ADYENa_EQ":["Adyen","ADYEN.AS"],
+  "INGAa_EQ":["ING Groep","INGA.AS"],
+  "PHIAa_EQ":["Philips","PHIA.AS"],
+  "UNIAa_EQ":["Unilever","UNA.AS"],
+  "PRXa_EQ":["Prosus","PRX.AS"],
+  "NESNs_EQ":["Nestlé","NESN.SW"],
+  "NOVNs_EQ":["Novartis","NOVN.SW"],
+  "ROGs_EQ":["Roche","ROG.SW"],
+  "UBSGs_EQ":["UBS Group","UBSG.SW"],
+  "AZNl_EQ":["AstraZeneca","AZN.L"],
+  "SHELl_EQ":["Shell","SHEL.L"],
+  "ULVRl_EQ":["Unilever","ULVR.L"],
+  "HSBAl_EQ":["HSBC","HSBA.L"],
+  "BPl_EQ":["BP","BP.L"],
+  "GSKl_EQ":["GSK","GSK.L"],
+  "DGEl_EQ":["Diageo","DGE.L"],
+  "RIOl_EQ":["Rio Tinto","RIO.L"],
+  "BATSl_EQ":["British American Tobacco","BATS.L"],
+  "RELl_EQ":["RELX","REL.L"],
+  "NNGFd_EQ":["National Grid","NG.L"],
+  "TSM_US_EQ":["TSMC","TSM"],
+  "SNE_US_EQ":["Sony","SONY"],
+  "TM_US_EQ":["Toyota","TM"],
+  "BABA_US_EQ":["Alibaba","BABA"],
+  "JD_US_EQ":["JD.com","JD"],
+  "PDD_US_EQ":["PDD","PDD"],
+  "BIDU_US_EQ":["Baidu","BIDU"],
+  "HDB_US_EQ":["HDFC Bank","HDB"],
+  "INFY_US_EQ":["Infosys","INFY"],
+  "IBN_US_EQ":["ICICI Bank","IBN"],
+  "WIT_US_EQ":["Wipro","WIT"],
+  "SFTBY_US_EQ":["SoftBank","SFTBY"],
+  "MUFG_US_EQ":["Mitsubishi UFJ","MUFG"],
+  "HMC_US_EQ":["Honda","HMC"],
+  "NMR_US_EQ":["Nomura","NMR"],
+  "CFRs_EQ":["Richemont","CFR.SW"]
+};
+const YF = {};
+Object.keys(T212).forEach((code) => { YF[T212[code][1]] = code; });
+const T212_RENAMES = { FB: "META", FPp: "TTE.PA", SNE: "SONY", DAI: "MBG.DE", NNGF: "NG.L" };
+
+function lookupTicker(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const wrapped = s.match(/^(.+?)\s+\(([^)]+)\)$/);
+  if (T212[s]) return { code: s, name: T212[s][0], symbol: T212[s][1] };
+  if (YF[s]) { const c = YF[s]; return { code: c, name: T212[c][0], symbol: T212[c][1] }; }
+  if (wrapped) {
+    const inner = wrapped[2], outer = wrapped[1];
+    if (T212[inner]) return { code: inner, name: T212[inner][0], symbol: T212[inner][1] };
+    if (YF[outer]) { const c = YF[outer]; return { code: c, name: T212[c][0], symbol: T212[c][1] }; }
+    if (T212[outer]) return { code: outer, name: T212[outer][0], symbol: T212[outer][1] };
+    return { code: inner, name: outer, symbol: outer };
+  }
+  const stripped = s.replace(/_US_EQ$/, "").replace(/_[A-Za-z]EQ$/, "").replace(/_EQ$/, "");
+  const symbol = T212_RENAMES[stripped] || stripped.replace(/_/g, "-");
+  return { code: s, name: symbol, symbol };
+}
+
+function formatTicker(raw) {
+  const hit = lookupTicker(raw);
+  if (!hit) return "–";
+  const label = hit.name + " (" + hit.symbol + ")";
+  const rawCode = hit.code && hit.code !== hit.symbol && hit.code !== label ? hit.code : "";
+  return `<div class="tk"${rawCode ? ` title="${esc(rawCode)}"` : ""}><b>${esc(label)}</b>${rawCode ? `<div class="raw">${esc(rawCode)}</div>` : ""}</div>`;
+}
+
+function prettyType(t) {
+  const s = String(t ?? "").trim();
+  if (!s) return "–";
+  const key = s.replace(/[\s-]+/g, "_").toUpperCase();
+  const map = { MARKET: "Market", LIMIT: "Limit", STOP: "Stop", STOP_LIMIT: "Stop limit", STOPLIMIT: "Stop limit" };
+  return map[key] || s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 
 function curveSvg(points) {
   if (!points.length) return '<div class="empty">No equity history yet.</div>';
@@ -119,12 +258,12 @@ function render(d) {
 
   $("positions").innerHTML = table(["Ticker", "Qty", "Avg price", "Price", "Stop", "To stop", "PnL (EUR)", "FX PnL", "Since"],
     positions.map((p) => { const st = stops[p.ticker] ?? null, cur = n(p.currentPrice); return [
-      `<b>${esc(p.ticker)}</b>`, num(p.quantity, 4), num(p.averagePrice), num(cur), st === null ? '<span class="neg">none</span>' : num(st),
+      formatTicker(p.ticker), num(p.quantity, 4), num(p.averagePrice), num(cur), st === null ? '<span class="neg">none</span>' : num(st),
       st !== null && cur ? pct((cur - st) / cur, 1).replace("+", "") : "–", `<span class="${cls(p.ppl)}">${eur(p.ppl)}</span>`, eur(p.fxPpl), esc((p.initialFillDate || "").slice(0, 10))]; }),
     "No open positions. The bot is in cash until a stock passes every rule.");
 
   $("orders").innerHTML = table(["Ticker", "Type", "Qty", "Stop", "Limit", "Status", "Created"],
-    orders.map((o) => [`<b>${esc(o.ticker)}</b>`, `<span class="chip">${esc(o.type)}</span>`, num(o.quantity, 4), num(o.stopPrice), num(o.limitPrice), esc(o.status), ams(o.creationTime)]),
+    orders.map((o) => [formatTicker(o.ticker), `<span class="chip">${esc(prettyType(o.type))}</span>`, num(o.quantity, 4), num(o.stopPrice), num(o.limitPrice), esc(o.status), ams(o.creationTime)]),
     "No pending orders.");
 
   const eqh = (j.equity_history || []).map((r) => ({ date: String(r.date).slice(0, 10), equity: +r.equity }));
@@ -145,7 +284,7 @@ function render(d) {
     ${ct.length ? "" : '<div class="empty">No closed trades yet. Results are measured in R (multiples of the initial risk).</div>'}`;
 
   $("closed").innerHTML = table(["Closed", "Ticker", "Qty", "Entry", "Exit", "R", "PnL (EUR)", "Reason"],
-    ct.map((t) => [ams(t.closed_at_ams), `<b>${esc(t.ticker)}</b>`, num(t.qty, 4), num(t.entry), num(t.exit), `<span class="${cls(t.r_multiple)}">${n(t.r_multiple) === null ? "–" : num(t.r_multiple) + " R"}</span>`, `<span class="${cls(t.realised_pnl_eur)}">${eur(t.realised_pnl_eur)}</span>`, esc(t.exit_reason)]),
+    ct.map((t) => [ams(t.closed_at_ams), formatTicker(t.ticker), num(t.qty, 4), num(t.entry), num(t.exit), `<span class="${cls(t.r_multiple)}">${n(t.r_multiple) === null ? "–" : num(t.r_multiple) + " R"}</span>`, `<span class="${cls(t.realised_pnl_eur)}">${eur(t.realised_pnl_eur)}</span>`, esc(t.exit_reason)]),
     "No closed trades yet.");
 
   const ss = snaps.screen_summary || {};
